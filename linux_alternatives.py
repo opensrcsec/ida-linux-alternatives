@@ -41,6 +41,7 @@ from ida_nalt import STRTYPE_C
 from ida_ua import create_insn
 from ida_lines import generate_disasm_line, add_extra_cmt, delete_extra_cmts, E_PREV
 from idautils import Segments, XrefsFrom
+from ida_ida import inf_get_bin_prefix_size
 import ida_kernwin
 import ida_netnode
 import ida_funcs
@@ -467,16 +468,31 @@ class Alternative_generator_t(object):
     def get_replacement_lines(ea, repl_len, instr_len, indent):
         lines = []
 
-        if repl_len == 0:
-            return ["%snop" % indent for i in range(instr_len)]
+        num_opcodes = inf_get_bin_prefix_size()
+        max_opcodes = len(indent)
 
         _len = 0
         while _len < repl_len:
             line, size = generate_disasm_line(ea + _len), get_item_size(ea + _len)
-            lines.append("%s%s" % (indent, line))
+            opcodes = " ".join(["%02x" % get_byte(ea + _len + i) for i in range(min(size, num_opcodes))])
+            if num_opcodes > 0:
+                if size > num_opcodes:
+                    opcodes += "+"
+                if len(opcodes) >= max_opcodes:
+                    opcodes += " " * 3
+            lines.append((opcodes, line))
+            max_opcodes = max(max_opcodes, len(opcodes))
             _len += size
 
-        return lines
+        if repl_len == 0:
+            while _len < instr_len:
+                line, size = "nop", 1
+                opcodes = " ".join(["90" for i in range(min(size, num_opcodes))])
+                lines.append((opcodes, line))
+                max_opcodes = max(max_opcodes, len(opcodes))
+                _len += size
+
+        return ["%s%s%s" % (opcodes, " " * (max_opcodes - len(opcodes)), line) for opcodes, line in lines]
 
     def _gen_replacement_line(self, row, processed_alternatives, indent=1):
         instr_ea, repl_ea, flag_str, instr_len, repl_len = row[:5]

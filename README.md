@@ -69,7 +69,12 @@ The plugin performs the following steps upon invocation:
 :----------------------------------------------:|:----------------------------------------------------:
 ![.altinstructions](images/altinstructions.png) | ![.altinstr_replacement](images/altreplacements.png)
 
-### 4. **Apply alternatives comments in the disassembly for all alternative entries found** <br/><br/>![alternative comment](images/alt_comment.png)
+### 4. **Apply alternatives comments in the disassembly for all alternative entries found**
+
+without opcodes                                | with opcodes
+:---------------------------------------------:|:-------------------------------------------------------------------:
+![alternative comment](images/alt_comment.png) | ![alternative comment with opcodes](images/alt_comment_opcodes.png)
+
 
 ### 5. **Open a new window with a tabular listing of the alternatives**
    * columns are sortable and addresses clickable <br/><br/>![alternatives window](images/alt_window.png)

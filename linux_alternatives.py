@@ -155,7 +155,7 @@ class Alternatives_viewer_t(PluginForm):
         self.parent.setLayout(layout)
 
     def jumpto(self, row, column):
-        jumpto(int(self.table.item(row, column).text(), 16))
+        jumpto(int(self.table.item(row, max(column, 1)).text(), 16))
 
     def OnClose(self, form):
         self.alternatives = None
@@ -495,10 +495,12 @@ class Alternative_generator_t(object):
         return ["%s%s%s" % (opcodes, " " * (max_opcodes - len(opcodes)), line) for opcodes, line in lines]
 
     def _gen_replacement_line(self, row, processed_alternatives, indent=1):
-        instr_ea, repl_ea, flag_str, instr_len, repl_len = row[:5]
+        index, instr_ea, repl_ea, flag_str, instr_len, repl_len = row[:6]
         line = []
 
-        line.append("%sif feature: %s" % (get_indent(4) * indent, flag_str))
+        index_str = "[0x%04x]" % index
+        indent_str = get_indent(4 + len(index_str)) * indent
+        line.append("%s%sif feature: %s" % (index_str, indent_str, flag_str))
 
         # Not just NOPs
         if repl_len != 0:
@@ -517,8 +519,7 @@ class Alternative_generator_t(object):
         return line
 
     def add_alternatives_cmts(self, row, processed_alternatives):
-        ea = row[0]
-        size = row[3]
+        ea, size = row[1], row[4]
         line = []
 
         if ea not in processed_alternatives:
@@ -557,6 +558,7 @@ class Alternative_generator_t(object):
 
         metadata = self.alt_instr_struct.get_struct_metadata()
 
+        index = 0
         processed_alternatives = {}
         for ea in range(alt_instr_seg.start_ea, alt_instr_seg.end_ea, self.alt_instr_struct.size):
             vinstr_ea, vrepl_ea, cpuid, instr_len, repl_len, padlens = self._get_alternative_row(ea, metadata)
@@ -575,7 +577,8 @@ class Alternative_generator_t(object):
             if repl_len > 0:
                 add_data_xref(vinstr_ea, vrepl_ea)
 
-            row = [vinstr_ea, vrepl_ea, flag_str, instr_len, repl_len] + padlens
+            row = [index, vinstr_ea, vrepl_ea, flag_str, instr_len, repl_len] + padlens
+            index += 1
 
             cb(row, processed_alternatives)
 
@@ -642,7 +645,7 @@ class Patch_input_t(ida_kernwin.action_handler_t):
         self.alt_gen.gen_alternatives(self.patch_rows, patch_features)
 
     def patch_rows(self, row, processed_alternatives):
-        instr_ea, repl_ea, flag_str, instr_len, repl_len = row[:5]
+        instr_ea, repl_ea, flag_str, instr_len, repl_len = row[1:6]
 
         repl_bytes = get_bytes(repl_ea, repl_len) if repl_len > 0 else  b''
         repl_bytes = self._recompute_branches(repl_bytes, instr_ea, repl_ea, instr_len, repl_len)
@@ -774,7 +777,8 @@ class Linux_alternatives_t(plugin_t):
         alternatives = alt_gen.gen_alternatives(alt_gen.add_alternatives_cmts)
         self._register_remove_action()
 
-        self.alternatives["header"] = [name for name, _, _ in self.alt_instr_struct.get_struct_metadata()]
+        self.alternatives["header"] = ["index"]
+        self.alternatives["header"] += [name for name, _, _ in self.alt_instr_struct.get_struct_metadata()]
         for _, rows in alternatives.items():
             for row in rows:
                 self.alternatives["rows"].append(row)
@@ -796,8 +800,10 @@ class Linux_alternatives_t(plugin_t):
     def _reset_alternatives(self):
         # Remove applied alternatives comments
         for row in self.alternatives.get("rows", []):
-            delete_extra_cmts(row[0], E_PREV)
-            delete_extra_cmts(row[0] + row[3], E_PREV)
+            ea, size = row[1], row[4]
+
+            delete_extra_cmts(ea, E_PREV)
+            delete_extra_cmts(ea + size, E_PREV)
 
         self.alternatives["header"] = []
         self.alternatives["rows"] = []

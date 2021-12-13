@@ -553,7 +553,7 @@ class Alternative_generator_t(object):
 
         return vinstr_ea, vrepl_ea, cpuid, instr_len, repl_len, padlens
 
-    def gen_alternatives(self, cb, req_features=[]):
+    def gen_alternatives(self, cb=None, req_features=[]):
         alt_instr_seg = get_segm_by_name(ALT_INSTR_SECTION)
 
         metadata = self.alt_instr_struct.get_struct_metadata()
@@ -580,7 +580,8 @@ class Alternative_generator_t(object):
             row = [index, vinstr_ea, vrepl_ea, flag_str, instr_len, repl_len] + padlens
             index += 1
 
-            cb(row, processed_alternatives)
+            if cb:
+                cb(row, processed_alternatives)
 
             if vinstr_ea not in processed_alternatives:
                 processed_alternatives[vinstr_ea] = []

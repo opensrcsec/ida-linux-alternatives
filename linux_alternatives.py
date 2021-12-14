@@ -683,17 +683,17 @@ class Patch_input_t(ida_kernwin.action_handler_t):
 
         def two_byte_jmp(displ):
             displ -= 2
-            return add_nops(b'\xeb' + displ.to_bytes(1), 5, 2)
+            return add_nops(b'\xeb' + displ.to_bytes(1, 'little', signed=True), 5, 2)
 
         def five_byte_jmp(displ):
             displ -= 5
-            return b'\xe9' + displ.to_bytes(4, 'little')
+            return b'\xe9' + displ.to_bytes(4, 'little', signed=True)
 
         new_opcodes = opcodes
 
         if is_rel_call(opcodes, repl_len):
             o_disp = ctypes.c_int(int.from_bytes(opcodes[1:], "little")).value
-            new_opcodes = b'\xe8' + ctypes.c_long(o_disp + (repl_ea - instr_ea)).value.to_bytes(4, 'little')
+            new_opcodes = b'\xe8' + ctypes.c_long(o_disp + (repl_ea - instr_ea)).value.to_bytes(4, 'little', signed=True)
         elif is_jmp(opcodes, repl_len):
             o_disp = ctypes.c_int(int.from_bytes(opcodes[1:], "little")).value
             next_rip = uint64(ctypes.c_long(repl_ea + 5).value)

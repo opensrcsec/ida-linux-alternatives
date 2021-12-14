@@ -446,11 +446,11 @@ class CPU_flags_t(object):
 
 
 class Alternative_generator_t(object):
-    def __init__(self, cpu_flags, alt_instr_struct):
+    def __init__(self, cpufeat_node):
         self.view = None
 
-        self.cpu_flags = cpu_flags
-        self.alt_instr_struct = alt_instr_struct
+        self.alt_instr_struct = Alt_instr_struct_t()
+        self.cpu_flags = CPU_flags_t(cpufeat_node)
 
     @staticmethod
     def create_replacement(repl_ea, repl_len):
@@ -637,12 +637,9 @@ class Patch_input_t(ida_kernwin.action_handler_t):
         self.current_flags = patch_features_str.upper()
         print("Patching alternatives for feature flags: %s" % patch_features_str)
 
-        self.alt_instr_struct = Alt_instr_struct_t()
-        self.cpu_flags = CPU_flags_t(self.cpufeat_node)
-
         patch_features = self._process_specified_features(self.current_flags)
 
-        self.alt_gen = Alternative_generator_t(self.cpu_flags, self.alt_instr_struct)
+        self.alt_gen = Alternative_generator_t(self.cpufeat_node)
         self.alt_gen.gen_alternatives(self.patch_rows, patch_features)
 
     def patch_rows(self, row, processed_alternatives):
@@ -771,15 +768,13 @@ class Linux_alternatives_t(plugin_t):
         self.reset()
         print("Running %s plugin..." % PLUGIN_NAME)
 
-        self.alt_instr_struct = Alt_instr_struct_t()
-        self.cpu_flags = CPU_flags_t(self.cpufeat_node)
-        alt_gen = Alternative_generator_t(self.cpu_flags, self.alt_instr_struct)
+        alt_gen = Alternative_generator_t(self.cpufeat_node)
 
         alternatives = alt_gen.gen_alternatives(alt_gen.add_alternatives_cmts)
         self._register_remove_action()
 
         self.alternatives["header"] = ["index"]
-        self.alternatives["header"] += [name for name, _, _ in self.alt_instr_struct.get_struct_metadata()]
+        self.alternatives["header"] += [name for name, _, _ in alt_gen.alt_instr_struct.get_struct_metadata()]
         for _, rows in alternatives.items():
             for row in rows:
                 self.alternatives["rows"].append(row)

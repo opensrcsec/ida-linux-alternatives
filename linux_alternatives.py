@@ -155,7 +155,10 @@ class Alternatives_viewer_t(PluginForm):
         self.parent.setLayout(layout)
 
     def jumpto(self, row, column):
-        jumpto(int(self.table.item(row, max(column, 1)).text(), 16))
+        try:
+            jumpto(int(self.table.item(row, max(column, 1)).text(), 16))
+        except:
+            pass
 
     def OnClose(self, form):
         self.alternatives = None

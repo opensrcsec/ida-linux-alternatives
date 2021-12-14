@@ -15,7 +15,7 @@ Installation
 
 ## System-wide installation:
 
-Copy `linux_alternatives.py` file into your `IDADIR/plugins` directory:
+Copy `linux_alternatives.py` file and `linux_alternatives_lib` directory into your `IDADIR/plugins` directory:
 
 | OS      | Typical global plugins directory path       |
 | ------- | ------------------------------------------- |
@@ -27,7 +27,7 @@ Where `x` should be the actual version number installed.
 
 ## User installation:
 
-Copy `linux_alternatives.py` file into your local user IDA plugins directory:
+Copy `linux_alternatives.py` file and `linux_alternatives_lib` directory into your local user IDA plugins directory:
 
 | OS          | Typical user plugins directory path  |
 | ----------- | ------------------------------------ |

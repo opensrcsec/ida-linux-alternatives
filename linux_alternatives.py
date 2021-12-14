@@ -42,10 +42,10 @@ from ida_ua import create_insn
 from ida_lines import generate_disasm_line, add_extra_cmt, delete_extra_cmts, E_PREV
 from idautils import Segments, XrefsFrom
 from ida_ida import inf_get_bin_prefix_size
+from PyQt5 import QtWidgets
 import ida_kernwin
 import ida_netnode
 import ida_funcs
-from PyQt5 import QtCore, QtGui, QtWidgets
 import ctypes
 import re
 import os
@@ -769,12 +769,12 @@ class Linux_alternatives_t(plugin_t):
         print("Running %s plugin..." % PLUGIN_NAME)
 
         alt_gen = Alternative_generator_t(self.cpufeat_node)
+        struct_metadata = alt_gen.alt_instr_struct.get_struct_metadata()
 
         alternatives = alt_gen.gen_alternatives(alt_gen.add_alternatives_cmts)
         self._register_remove_action()
 
-        self.alternatives["header"] = ["index"]
-        self.alternatives["header"] += [name for name, _, _ in alt_gen.alt_instr_struct.get_struct_metadata()]
+        self.alternatives["header"] = ["index"] + [name for name, _, _ in struct_metadata]
         for _, rows in alternatives.items():
             for row in rows:
                 self.alternatives["rows"].append(row)

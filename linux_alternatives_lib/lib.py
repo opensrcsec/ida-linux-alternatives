@@ -481,3 +481,96 @@ class Alternative_generator_t(object):
         return processed_alternatives
 
 
+class Alternative_patcher_t(object):
+    def __init__(self, cpufeat_node):
+        self.alt_gen = Alternative_generator_t(cpufeat_node)
+
+    def patch(self, features):
+        features = features.upper()
+        print("Patching alternatives for feature flags: %s" % features)
+
+        self.alt_gen.gen_alternatives(self._patch_rows, self._process_features(features))
+        auto_wait()
+
+    def unpatch(self):
+        visit_patched_bytes(0, BADADDR, self._unpatch_byte)
+        auto_wait()
+
+    @staticmethod
+    def _unpatch_byte(ea, fpos, org_val, patch_val):
+        del_extra_cmt(ea, E_PREV)
+        revert_byte(ea)
+        auto_make_code(ea)
+        restore_xrefs(ea)
+        return 0
+
+    def _patch_rows(self, row, processed_alternatives):
+        instr_ea, repl_ea, flag_str, instr_len, repl_len = row[1:6]
+
+        repl_bytes = get_bytes(repl_ea, repl_len) if repl_len > 0 else  b''
+        repl_bytes = self._recompute_branches(repl_bytes, instr_ea, repl_ea, instr_len, repl_len)
+
+        # Save original disassembly
+        orig_insns = self.alt_gen.get_replacement_lines(instr_ea, instr_len, instr_len, get_indent(-4))
+
+        patch_bytes(instr_ea, repl_bytes)
+
+        # Tell IDA to make code explicitely
+        self.alt_gen.create_replacement(instr_ea, instr_len)
+        restore_xrefs(instr_ea)
+
+        cmt = ["%sAlternative %s applied" % (get_indent(), flag_str)]
+        cmt.append("%sOriginal instructions:\n%s" % (get_indent(), "\n".join(orig_insns)))
+        add_extra_cmt(instr_ea, True, "\n".join(cmt))
+
+    def _recompute_branches(self, opcodes, instr_ea, repl_ea, instr_len, repl_len):
+        def is_rel_call(opcodes, size):
+            return size == 5 and opcodes[0] == 0xe8
+
+        def is_jmp(opcodes, size):
+            return size in [5, 6] and opcodes[0] in [0xeb, 0xe9] # 6 covers for SLS barrier
+
+        def add_nops(opcodes, instr_len, repl_len):
+            return opcodes + b'\x90' * (instr_len - repl_len)
+
+        def two_byte_jmp(displ):
+            displ -= 2
+            return add_nops(b'\xeb' + displ.to_bytes(1, 'little', signed=True), 5, 2)
+
+        def five_byte_jmp(displ):
+            displ -= 5
+            return b'\xe9' + displ.to_bytes(4, 'little', signed=True)
+
+        new_opcodes = opcodes
+
+        if is_rel_call(opcodes, repl_len):
+            o_disp = ctypes.c_int(int.from_bytes(opcodes[1:], "little")).value
+            new_opcodes = b'\xe8' + ctypes.c_long(o_disp + (repl_ea - instr_ea)).value.to_bytes(4, 'little', signed=True)
+        elif is_jmp(opcodes, repl_len):
+            o_disp = ctypes.c_int(int.from_bytes(opcodes[1:], "little")).value
+            next_rip = uint64(ctypes.c_long(repl_ea + 5).value)
+            tgt_rip = uint64(ctypes.c_long(next_rip + o_disp).value)
+            n_dspl = ctypes.c_int(tgt_rip - instr_ea).value
+
+            if ctypes.c_long(tgt_rip - instr_ea).value >= 0:
+                new_opcodes = two_byte_jmp(n_dspl) if n_dspl - 2 <= 127 else five_byte_jmp(n_dspl)
+            else:
+                new_opcodes = two_byte_jmp(n_dspl) if ((n_dspl - 2) & 0xff) == n_dspl - 2 else five_byte_jmp(n_dspl)
+        elif instr_len > repl_len:
+            new_opcodes = add_nops(opcodes, instr_len, repl_len)
+
+        return new_opcodes
+
+    def _process_features(self, input_features):
+        features = []
+
+        for feature in input_features.split(','):
+            feature = feature.strip()
+            try:
+                cpuid = int(feature, 0)
+                _, name = self.cpu_flags.get_flag_name(cpuid)
+                features.append(name)
+            except:
+                features.append(feature.upper())
+
+        return features
